@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import tensorflow as tf
-import threading
+# import threading
+from multiprocessing import Pool
 import numpy as np
 
 import signal
@@ -123,39 +124,74 @@ def train_function(parallel_index):
     global_t += diff_global_t
     
     
-def signal_handler(signal, frame):
-  global stop_requested
-  print('You pressed Ctrl+C!')
-  stop_requested = True
+# def signal_handler(signal, frame):
+#   global stop_requested
+#   print('You pressed Ctrl+C!')
+#   stop_requested = True
   
-train_threads = []
-for i in range(PARALLEL_SIZE):
-  train_threads.append(threading.Thread(target=train_function, args=(i,)))
+# train_threads = []
+# for i in range(PARALLEL_SIZE):
+#   train_threads.append(threading.Thread(target=train_function, args=(i,)))
   
-signal.signal(signal.SIGINT, signal_handler)
+# signal.signal(signal.SIGINT, signal_handler)
 
+pool = Pool(PARALLEL_SIZE)
 # set start time
 start_time = time.time() - wall_t
 
-for t in train_threads:
-  t.start()
+try:
+  res = pool.apply_async(train_function, args=(i,))
+  print('Press Ctrl+C to stop')
+  res.get(60) # Without the timeout this blocking call ignores all signals.
+except KeyboardInterrupt:
+  print('You pressed Ctrl+C!')
+  pool.terminate()
+  print('Now saving data. Please wait')
+  if not os.path.exists(CHECKPOINT_DIR):
+    os.mkdir(CHECKPOINT_DIR)  
 
-print('Press Ctrl+C to stop')
-signal.pause()
-
-print('Now saving data. Please wait')
+  # write wall time
+  wall_t = time.time() - start_time
+  wall_t_fname = CHECKPOINT_DIR + '/' + 'wall_t.' + str(global_t)
+  with open(wall_t_fname, 'w') as f:
+    f.write(str(wall_t))
   
-for t in train_threads:
-  t.join()
+  saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
+else:
+  print("Normal termination")
+  pool.close()
+  print('Now saving data. Please wait')
+  if not os.path.exists(CHECKPOINT_DIR):
+    os.mkdir(CHECKPOINT_DIR)  
 
-if not os.path.exists(CHECKPOINT_DIR):
-  os.mkdir(CHECKPOINT_DIR)  
+  # write wall time
+  wall_t = time.time() - start_time
+  wall_t_fname = CHECKPOINT_DIR + '/' + 'wall_t.' + str(global_t)
+  with open(wall_t_fname, 'w') as f:
+    f.write(str(wall_t))
+  
+  saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
+pool.join()
 
-# write wall time
-wall_t = time.time() - start_time
-wall_t_fname = CHECKPOINT_DIR + '/' + 'wall_t.' + str(global_t)
-with open(wall_t_fname, 'w') as f:
-  f.write(str(wall_t))
+# for t in train_threads:
+#   t.start()
 
-saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
+# print('Press Ctrl+C to stop')
+# signal.pause()
+
+# print('Now saving data. Please wait')
+  
+# for t in train_threads:
+#   t.join()
+
+# if not os.path.exists(CHECKPOINT_DIR):
+#   os.mkdir(CHECKPOINT_DIR)  
+
+# # write wall time
+# wall_t = time.time() - start_time
+# wall_t_fname = CHECKPOINT_DIR + '/' + 'wall_t.' + str(global_t)
+# with open(wall_t_fname, 'w') as f:
+#   f.write(str(wall_t))
+
+# saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
 
