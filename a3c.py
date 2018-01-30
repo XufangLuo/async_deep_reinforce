@@ -135,17 +135,24 @@ def train_function(parallel_index):
   
 # signal.signal(signal.SIGINT, signal_handler)
 
-pool = Pool(PARALLEL_SIZE)
+def init_worker():
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+
+pool = Pool(PARALLEL_SIZE, init_worker)
 # set start time
 start_time = time.time() - wall_t
 
 try:
-  res = pool.apply_async(train_function, args=(i,))
+  for i in range(PARALLEL_SIZE):
+    pool.apply_async(train_function, args=(i,))
   print('Press Ctrl+C to stop')
-  res.get(60) # Without the timeout this blocking call ignores all signals.
+  # res.get(60) # Without the timeout this blocking call ignores all signals.
+  pool.close()
+  pool.join()
 except KeyboardInterrupt:
   print('You pressed Ctrl+C!')
   pool.terminate()
+  pool.join()
   print('Now saving data. Please wait')
   if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)  
@@ -159,7 +166,6 @@ except KeyboardInterrupt:
   saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
 else:
   print("Normal termination")
-  pool.close()
   print('Now saving data. Please wait')
   if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)  
@@ -171,7 +177,6 @@ else:
     f.write(str(wall_t))
   
   saver.save(sess, CHECKPOINT_DIR + '/' + 'checkpoint', global_step = global_t)
-pool.join()
 
 # for t in train_threads:
 #   t.start()
