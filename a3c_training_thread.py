@@ -4,6 +4,7 @@ import numpy as np
 import random
 import time
 import sys
+import os
 
 from game_state import GameState
 from game_state import ACTION_SIZE
@@ -90,8 +91,12 @@ class A3CTrainingThread(object):
 
     terminal_end = False
 
+    print("1111  I am process", os.getpid())
+
     # copy weights from shared to local
     sess.run( self.sync )
+
+    print("I am process", os.getpid())
 
     start_local_t = self.local_t
 
